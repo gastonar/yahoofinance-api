@@ -5,32 +5,18 @@ import yahoofinance.YahooFinance;
 
 import java.io.*;
 import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static java.lang.Double.parseDouble;
 
-public class Main {
+public class StockSimulation extends TimerTask {
 
     private static String stockSymbolsFilename = "sp500companies.csv";
     private static String stockDataFilename = "stock_data.csv";
 
     public static void main(String[] args) {
-        // create file if necessary
-        // get list of companies
-        // get stock data for each company
-        // read stock data stored locally
-        // compare previous data with new data
-        // write updated data to csv
-        List<String> stockSymbols = getStockSymbolsFromCsv(stockSymbolsFilename);
-        String[] stockSymbolsArray = new String[stockSymbols.size()];
-        Map<String, Stock> stockData = getYahooFinanceData(stockSymbols.toArray(stockSymbolsArray));
-
-        List<StockCsvData> previousStockData = getStoredStockDataFromCsv(stockDataFilename);
-        List<StockCsvData> currentStockData = getStockListFromMap(stockData);
-        List<StockCsvData> updatedStockData = comparePreviousAndCurrentStockData(previousStockData, currentStockData);
-        sortStockByPercentChange(updatedStockData);
-        writeStockDataToCsv(updatedStockData);
+        Timer timer = new Timer();
+        timer.schedule(new StockSimulation(), 0,60000 * 20);
     }
 
     private static List<StockCsvData> comparePreviousAndCurrentStockData(List<StockCsvData> previousStockData, List<StockCsvData> currentStockData) {
@@ -40,20 +26,26 @@ public class Main {
 
         for (String symbol : currentStockDataMap.keySet()) {
             StockCsvData previousStock = previousStockDataMap.get(symbol);
+            boolean updated = true;
             if (previousStock != null) {
-                updatePreviousFieldsFromStoredData(currentStockDataMap.get(symbol), previousStock);
+                updated = updatePreviousFieldsFromStoredData(currentStockDataMap.get(symbol), previousStock);
             }
-            updatedStockData.add(currentStockDataMap.get(symbol));
+            if (updated) {
+                updatedStockData.add(currentStockDataMap.get(symbol));
+            } else {
+                updatedStockData.add(previousStock);
+            }
         }
 
         return updatedStockData;
     }
 
-    private static void updatePreviousFieldsFromStoredData(StockCsvData stockCsvData, StockCsvData previousStock) {
+    private static boolean updatePreviousFieldsFromStoredData(StockCsvData stockCsvData, StockCsvData previousStock) {
+
         String previousPrice = previousStock.getLastPrice();
         String previousPriceDate = previousStock.getLastPriceDate();
         if (previousPriceDate.equals(stockCsvData.getLastPriceDate())) {
-            return;
+            return false;
         }
         double nominalChange = parseDouble(stockCsvData.getLastPrice()) - parseDouble(previousPrice);
         double percentChange = (parseDouble(stockCsvData.getLastPrice()) - parseDouble(previousPrice)) / parseDouble(previousPrice);
@@ -61,6 +53,7 @@ public class Main {
         stockCsvData.setPreviousDate(previousPriceDate);
         stockCsvData.setNominalChange(String.valueOf(nominalChange));
         stockCsvData.setPercentChange(String.valueOf(percentChange));
+        return true;
     }
 
     private static Map<String, StockCsvData> getMapFromStockList(List<StockCsvData> stockCsvDataList) {
@@ -171,6 +164,26 @@ public class Main {
             e.printStackTrace();
         }
         return stockSymbols;
+    }
+
+    @Override
+    public void run() {
+        // create file if necessary
+        // get list of companies
+        // get stock data for each company
+        // read stock data stored locally
+        // compare previous data with new data
+        // write updated data to csv
+        System.out.println("Running stock data retrieval at " + new Date().toString());
+        List<String> stockSymbols = getStockSymbolsFromCsv(stockSymbolsFilename);
+        String[] stockSymbolsArray = new String[stockSymbols.size()];
+        Map<String, Stock> stockData = getYahooFinanceData(stockSymbols.toArray(stockSymbolsArray));
+
+        List<StockCsvData> previousStockData = getStoredStockDataFromCsv(stockDataFilename);
+        List<StockCsvData> currentStockData = getStockListFromMap(stockData);
+        List<StockCsvData> updatedStockData = comparePreviousAndCurrentStockData(previousStockData, currentStockData);
+        sortStockByPercentChange(updatedStockData);
+        writeStockDataToCsv(updatedStockData);
     }
 
 }
